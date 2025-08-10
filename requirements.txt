@@ -1,1 +1,3 @@
 eel
+SQLAlchemy
+psycopg2-binary
