@@ -8,8 +8,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 # --- 資料庫設定 ---
-# 優先從環境變數讀取 DATABASE_URL (用於 Render 部署)
-# 如果找不到，則使用本地的 SQLite 資料庫 (用於本機開發測試)
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///kids_diet.db")
 
 engine = create_engine(DATABASE_URL)
@@ -112,6 +110,32 @@ def set_setting(db, key, value):
         setting = Setting(key=key, value=value)
         db.add(setting)
 
+def get_or_create_log(db, date):
+    log = db.query(DailyLog).filter(DailyLog.date == date).first()
+    if not log:
+        log = DailyLog(date=date, diet=[], exercise=[], completed=False)
+        db.add(log)
+    return log
+
+def calculate_current_streak(db):
+    today = datetime.date.today()
+    completed_logs = db.query(DailyLog.date).filter(DailyLog.completed == True).order_by(DailyLog.date.desc()).all()
+    if not completed_logs: return 0
+
+    consecutive_count = 0
+    expected_date = today
+    # If today is not completed, the streak is from yesterday
+    if not db.query(DailyLog).filter(DailyLog.date == today, DailyLog.completed == True).first():
+        expected_date -= datetime.timedelta(days=1)
+
+    for (log_date,) in completed_logs:
+        if log_date == expected_date:
+            consecutive_count += 1
+            expected_date -= datetime.timedelta(days=1)
+        elif log_date < expected_date:
+            break
+    return consecutive_count
+
 # --- Eel 公開函式 ---
 @eel.expose
 def get_app_data():
@@ -119,27 +143,24 @@ def get_app_data():
     try:
         name = get_setting(db, 'name')
         if not name:
-            # 尚未初始化
             config = json.load(open("config.json", "r", encoding="utf-8"))
             return {"config": config, "data": {"name": None}}
 
-        # 從資料庫讀取所有資料
         data = {s.key: s.value for s in db.query(Setting).all()}
-        
         history = db.query(WeightHistory).order_by(WeightHistory.date).all()
         data['weight_history'] = [{"date": h.date.isoformat(), "weight": h.weight, "height": h.height, "bmi": h.bmi, "bmi_status": h.bmi_status} for h in history]
-        
         logs = db.query(DailyLog).all()
         data['daily_logs'] = {log.date.isoformat(): {"diet": log.diet, "exercise": log.exercise, "completed": log.completed} for log in logs}
 
-        # 計算最新的BMI
         if history:
             latest_record = history[-1]
             data['bmi_info'] = {"bmi": latest_record.bmi, "status": latest_record.bmi_status}
         else:
             data['bmi_info'] = None
         
-        config = json.load(open("config.json", "r", encoding="utf-8"))
+        data['current_streak'] = calculate_current_streak(db)
+
+        config = json.load(open("config.json", "r", encoding="utf--8"))
         return {"config": config, "data": data}
     finally:
         db.close()
@@ -150,20 +171,16 @@ def save_initial(form_data):
     db = SessionLocal()
     try:
         today = datetime.date.today()
-        # 儲存基本設定
         for key, value in form_data.items():
             set_setting(db, key, value)
         set_setting(db, 'points', 0)
 
-        # 儲存第一筆體重歷史
         height = float(form_data['height'])
         weight = float(form_data['initial_weight'])
         bmi_info = calculate_bmi_status(form_data['birthdate'], form_data['gender'], weight, height, today)
         
         new_history = WeightHistory(
-            date=today,
-            weight=weight,
-            height=height,
+            date=today, weight=weight, height=height,
             bmi=bmi_info.get('bmi') if bmi_info else None,
             bmi_status=bmi_info.get('status') if bmi_info else None
         )
@@ -204,7 +221,7 @@ def save_height_and_weight(height_str, weight_str):
             )
             db.add(new_record)
         
-        set_setting(db, 'height', new_height) # 更新最新身高
+        set_setting(db, 'height', new_height)
         db.commit()
         return get_app_data()['data']
     except ValueError:
@@ -213,21 +230,13 @@ def save_height_and_weight(height_str, weight_str):
     finally:
         db.close()
 
-def get_or_create_log(db, date):
-    log = db.query(DailyLog).filter(DailyLog.date == date).first()
-    if not log:
-        log = DailyLog(date=date, diet=[], exercise=[], completed=False)
-        db.add(log)
-    return log
-
 @eel.expose
 def save_diet(selected_options):
-    if not selected_options: return {"error": "你尚未選擇任何飲食項目喔！"}
     db = SessionLocal()
     try:
         today = datetime.date.today()
         log = get_or_create_log(db, today)
-        log.diet = selected_options
+        log.diet = selected_options if selected_options is not None else []
         db.commit()
         return get_app_data()['data']
     finally:
@@ -235,41 +244,67 @@ def save_diet(selected_options):
 
 @eel.expose
 def save_exercise(selected_exercises):
-    if not selected_exercises: return {"error": "你尚未選擇任何運動項目喔！"}
     db = SessionLocal()
     try:
         today = datetime.date.today()
         log = get_or_create_log(db, today)
-        log.exercise = selected_exercises
+        log.exercise = selected_exercises if selected_exercises is not None else []
         db.commit()
         return get_app_data()['data']
     finally:
         db.close()
+
+def check_and_award_consecutive_points(db):
+    today = datetime.date.today()
+    # We need to calculate the streak based on the state *before* committing the current day
+    streak_before_today = calculate_current_streak(db)
+    consecutive_count = streak_before_today + 1 # The streak after completing today
+
+    message = ""
+    last_7_day_award_str = get_setting(db, 'last_7_day_award_date')
+    if consecutive_count >= 7 and (not last_7_day_award_str or (today - datetime.date.fromisoformat(last_7_day_award_str)).days >= 7):
+        current_points = get_setting(db, 'points', 0)
+        set_setting(db, 'points', current_points + 10)
+        set_setting(db, 'last_7_day_award_date', today.isoformat())
+        message += "恭喜！連續完成7天任務，額外獲得10點獎勵！ "
+
+    last_30_day_award_str = get_setting(db, 'last_30_day_award_date')
+    if consecutive_count >= 30 and (not last_30_day_award_str or (today - datetime.date.fromisoformat(last_30_day_award_str)).days >= 30):
+        current_points = get_setting(db, 'points', 0)
+        set_setting(db, 'points', current_points + 10)
+        set_setting(db, 'last_30_day_award_date', today.isoformat())
+        message += "恭喜！連續完成30天任務，額外獲得10點獎勵！"
+
+    return message if message else None
 
 @eel.expose
 def complete_day():
     db = SessionLocal()
     try:
         today = datetime.date.today()
-        log = db.query(DailyLog).filter(DailyLog.date == today).first()
+        log = get_or_create_log(db, today)
 
-        if not log or (not log.diet and not log.exercise):
-            return {"error": "先記錄今天的飲食或運動，才能完成任務喔！"}
-        if log.get("completed"):
-            return {"message": "今天已經完成過任務囉！"}
+        if log.completed:
+            return {"message": "今天已經完成過任務囉！", "data": get_app_data()['data']}
 
-        diet_points = len(log.diet)
-        exercise_points = len(log.exercise) * 2
+        diet_points = len(log.diet) if log.diet else 0
+        exercise_points = (len(log.exercise) if log.exercise else 0) * 2
         points_earned = diet_points + exercise_points
         
-        current_points = get_setting(db, 'points', 0)
-        set_setting(db, 'points', current_points + points_earned)
-        log.completed = True
+        if points_earned > 0:
+            current_points = get_setting(db, 'points', 0)
+            set_setting(db, 'points', current_points + points_earned)
         
-        # TODO: 連續任務獎勵邏輯需要重寫
-        
+        consecutive_message = check_and_award_consecutive_points(db)
+        log.completed = True # Mark as completed AFTER checking for award
         db.commit()
-        message = f"恭喜！今天任務完成！獲得 {points_earned} 點數！"
+        
+        message = "今日紀錄完成！"
+        if points_earned > 0:
+            message += f" 恭喜獲得 {points_earned} 點數！"
+        if consecutive_message:
+            message += f"\n{consecutive_message}"
+            
         return {"data": get_app_data()['data'], "message": message}
     finally:
         db.close()
@@ -301,19 +336,14 @@ def get_calendar_data():
 
 # --- 啟動程式 ---
 def init_db():
-    # 建立資料庫表格
     Base.metadata.create_all(bind=engine)
 
 if __name__ == "__main__":
     print("正在初始化資料庫...")
     init_db()
-
-    # 初始化 Eel，指定網頁檔案在 'web' 資料夾
     eel.init('web')
-    
     port = int(os.environ.get('PORT', 8000))
     host = '0.0.0.0' if 'DATABASE_URL' in os.environ else 'localhost'
-    
     try:
         print(f"正在啟動應用程式於 http://{host}:{port}")
         eel.start('index.html', mode=None, host=host, port=port)

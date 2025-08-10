@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `,
         dashboard: () => {
-            const { name, points, weight_history, target_weight, daily_logs, bmi_info } = state.data;
+            const { name, points, weight_history, daily_logs, bmi_info, current_streak } = state.data;
             const current_weight = weight_history.length > 0 ? weight_history[weight_history.length - 1].weight : 'N/A';
             const tip = state.config.daily_tips[Math.floor(Math.random() * state.config.daily_tips.length)];
             const today = new Date().toISOString().split('T')[0];
@@ -93,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="stats-grid">
                         <div class="stat-item"><h3>目前體重</h3><p>${current_weight} kg</p></div>
                         ${bmi_html}
+                        <div class="stat-item"><h3>連續任務</h3><p>${current_streak} 天</p></div>
                         <div class="stat-item"><h3>我的點數 <a href="#" class="info-link" data-view="rules">?</a></h3><p>${points}</p></div>
                     </div>
                 </div>
