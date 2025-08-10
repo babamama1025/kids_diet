@@ -307,6 +307,9 @@ def init_db():
 if __name__ == "__main__":
     print("正在初始化資料庫...")
     init_db()
+
+    # 初始化 Eel，指定網頁檔案在 'web' 資料夾
+    eel.init('web')
     
     port = int(os.environ.get('PORT', 8000))
     host = '0.0.0.0' if 'DATABASE_URL' in os.environ else 'localhost'
