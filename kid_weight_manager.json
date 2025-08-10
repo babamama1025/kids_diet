@@ -1,0 +1,38 @@
+{
+    "name": "Johan",
+    "target_weight": 35.0,
+    "points": 4,
+    "height": 139.0,
+    "birthdate": "2017-01-22",
+    "gender": "boys",
+    "weight_history": [
+        {
+            "date": "2025-08-09",
+            "weight": 40.0,
+			"height": 139.0
+        },
+        {
+            "date": "2025-08-10",
+            "weight": 38.9,
+            "height": 139.0
+        }
+    ],
+    "daily_logs": {
+        "2025-08-09": {
+            "exercise": [
+                "游泳"
+            ],
+            "diet": [
+                "喝了1.5瓶水",
+                "沒有吃宵夜"
+            ],
+            "completed": true
+        },
+        "2025-08-10": {
+            "diet": [
+                "晚餐：少於一碗飯"
+            ]
+        }
+    },
+    "initial_weight": 40.0
+}
