@@ -74,7 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const { name, points, weight_history, daily_logs, bmi_info, current_streak } = state.data;
             const current_weight = weight_history.length > 0 ? weight_history[weight_history.length - 1].weight : 'N/A';
             const tip = state.config.daily_tips[Math.floor(Math.random() * state.config.daily_tips.length)];
-            const today = new Date().toISOString().split('T')[0];
+            // Manually format today's date string to avoid timezone issues with toISOString()
+            const d = new Date();
+            const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             const todayLog = daily_logs[today] || {};
             const isCompleted = todayLog.completed;
             const dietLogged = todayLog.diet && todayLog.diet.length > 0;
