@@ -160,7 +160,7 @@ def get_app_data():
         
         data['current_streak'] = calculate_current_streak(db)
 
-        config = json.load(open("config.json", "r", encoding="utf--8"))
+        config = json.load(open("config.json", "r", encoding="utf-8"))
         return {"config": config, "data": data}
     finally:
         db.close()
@@ -331,6 +331,53 @@ def get_calendar_data():
     try:
         logs = db.query(DailyLog).all()
         return {"daily_logs": {log.date.isoformat(): {"completed": log.completed} for log in logs}}
+    finally:
+        db.close()
+
+@eel.expose
+def populate_test_data():
+    db = SessionLocal()
+    try:
+        # Clear existing data for a clean test run
+        db.query(DailyLog).delete()
+        db.query(WeightHistory).delete()
+        db.query(Setting).filter(Setting.key.in_(['name', 'gender', 'birthdate', 'height', 'initial_weight', 'target_weight', 'points', 'last_7_day_award_date', 'last_30_day_award_date'])).delete()
+        db.commit()
+
+        # Add initial settings
+        set_setting(db, 'name', '測試小孩')
+        set_setting(db, 'gender', 'boys')
+        set_setting(db, 'birthdate', '2020-01-01')
+        set_setting(db, 'height', 100.0)
+        set_setting(db, 'initial_weight', 15.0)
+        set_setting(db, 'target_weight', 20.0)
+        set_setting(db, 'points', 100)
+        db.commit()
+
+        # Add fake weight history
+        today = datetime.date.today()
+        for i in range(10, 0, -1): # Last 10 days
+            record_date = today - datetime.timedelta(days=i)
+            weight = 15.0 + (10 - i) * 0.1 # Increasing weight
+            height = 100.0 # Assume height is constant for simplicity
+            bmi_info = calculate_bmi_status('2020-01-01', 'boys', weight, height, record_date)
+            db.add(WeightHistory(
+                date=record_date, weight=weight, height=height,
+                bmi=bmi_info['bmi'], bmi_status=bmi_info['status']
+            ))
+        db.commit()
+
+        # Add fake daily logs
+        db.add(DailyLog(date=today - datetime.timedelta(days=3), diet=["早餐", "午餐"], exercise=["跑步"], completed=True))
+        db.add(DailyLog(date=today - datetime.timedelta(days=2), diet=["晚餐"], exercise=[], completed=False))
+        db.add(DailyLog(date=today - datetime.timedelta(days=1), diet=["早餐", "午餐", "晚餐"], exercise=["跳繩", "散步"], completed=True))
+        db.add(DailyLog(date=today, diet=["早餐"], exercise=[], completed=False))
+        db.commit()
+
+        return {"message": "測試資料已成功載入！"}
+    except Exception as e:
+        db.rollback()
+        return {"error": f"載入測試資料失敗: {str(e)}"}
     finally:
         db.close()
 

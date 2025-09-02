@@ -34,6 +34,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // --- HELPER FUNCTIONS ---
+    const displayDailyLogDetails = (dateString, dailyLogs, targetElementId) => {
+        const log = dailyLogs[dateString];
+        const detailsElement = document.getElementById(targetElementId);
+        if (log) {
+            detailsElement.innerHTML = `
+                <h4>${dateString}</h4>
+                <p><b>飲食:</b><br>${log.diet?.join(', ') || '未記錄'}</p>
+                <p><b>運動:</b><br>${log.exercise?.join(', ') || '未記錄'}</p>
+                <p><b>任務完成:</b> ${log.completed ? '是' : '否'}</p>
+            `;
+        } else {
+            detailsElement.innerHTML = `<h4>${dateString}</h4><p>無記錄</p>`;
+        }
+    };
+
     // --- VIEWS / TEMPLATES ---
     const views = {
         setup: () => `
@@ -222,6 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="day-name">六</div>
                     <!-- Calendar days will be inserted here by JS -->
                 </div>
+                <div id="calendar-history-details" class="history-details">點擊日曆上的日期查看詳情</div>
                 <button data-view="dashboard" class="secondary">返回</button>
             </div>
         `
@@ -284,14 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (view === 'history') {
             document.querySelectorAll('.history-list li').forEach(li => {
                 li.onclick = () => {
-                    const log = state.data.daily_logs[li.dataset.date];
-                    const details = document.getElementById('history-details');
-                    details.innerHTML = `
-                        <h4>${li.dataset.date}</h4>
-                        <p><b>飲食:</b><br>${log.diet?.join(', ') || '未記錄'}</p>
-                        <p><b>運動:</b><br>${log.exercise?.join(', ') || '未記錄'}</p>
-                        <p><b>任務完成:</b> ${log.completed ? '是' : '否'}</p>
-                    `;
+                    displayDailyLogDetails(li.dataset.date, state.data.daily_logs, 'history-details');
                 };
             });
         } else if (view === 'chart') {
@@ -407,8 +417,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         dayElement.classList.add('completed');
                         dayElement.title = '任務已完成！';
                     }
+                    dayElement.dataset.date = dateString; // Add data-date attribute
                     calendarGrid.appendChild(dayElement);
                 }
+
+                // Add event listeners to calendar days
+                document.querySelectorAll('.calendar-day:not(.empty)').forEach(dayEl => {
+                    dayEl.onclick = () => {
+                        displayDailyLogDetails(dayEl.dataset.date, dailyLogs, 'calendar-history-details');
+                    };
+                });
             };
 
             document.getElementById('prevMonth').onclick = () => {
