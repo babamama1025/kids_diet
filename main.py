@@ -330,7 +330,7 @@ def get_calendar_data():
     db = SessionLocal()
     try:
         logs = db.query(DailyLog).all()
-        return {"daily_logs": {log.date.isoformat(): {"completed": log.completed} for log in logs}}
+        return {"daily_logs": {log.date.isoformat(): {"diet": log.diet, "exercise": log.exercise, "completed": log.completed} for log in logs}}
     finally:
         db.close()
 
