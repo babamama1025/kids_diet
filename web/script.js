@@ -35,19 +35,33 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- HELPER FUNCTIONS ---
-    const displayDailyLogDetails = (dateString, dailyLogs, targetElementId) => {
-        const log = dailyLogs[dateString];
-        const detailsElement = document.getElementById(targetElementId);
-        if (log) {
-            detailsElement.innerHTML = `
-                <h4>${dateString}</h4>
-                <p><b>飲食:</b><br>${log.diet?.join(', ') || '未記錄'}</p>
-                <p><b>運動:</b><br>${log.exercise?.join(', ') || '未記錄'}</p>
-                <p><b>任務完成:</b> ${log.completed ? '是' : '否'}</p>
-            `;
+    const displayDailyDetails = (dateString, targetElementId) => {
+        const log = state.data.daily_logs[dateString];
+        const pointsForDay = state.data.points_history.filter(p => p.timestamp.startsWith(dateString));
+
+        let detailsHTML = `<h4>${dateString}</h4>`;
+
+        // Diet and Exercise
+        detailsHTML += `<p><b>飲食:</b><br>${log?.diet?.join(', ') || '未記錄'}</p>`;
+        detailsHTML += `<p><b>運動:</b><br>${log?.exercise?.join(', ') || '未記錄'}</p>`;
+        detailsHTML += `<p><b>任務完成:</b> ${log?.completed ? '是' : '否'}</p>`;
+
+        // Points History
+        detailsHTML += `<hr><h5>點數紀錄:</h5>`;
+        if (pointsForDay.length > 0) {
+            detailsHTML += '<ul class="points-history-list">';
+            // Reverse to show earliest first for the day
+            pointsForDay.slice().reverse().forEach(p => {
+                const pointClass = p.points_change >= 0 ? 'points-gain' : 'points-loss';
+                const sign = p.points_change > 0 ? '+' : '';
+                detailsHTML += `<li><span class="timestamp">${p.timestamp.split(' ')[1]}</span> ${p.description}: <span class="${pointClass}">${sign}${p.points_change}</span> (總計: ${p.current_total})</li>`;
+            });
+            detailsHTML += '</ul>';
         } else {
-            detailsElement.innerHTML = `<h4>${dateString}</h4><p>無記錄</p>`;
+            detailsHTML += '<p>當天沒有點數變動</p>';
         }
+
+        document.getElementById(targetElementId).innerHTML = detailsHTML;
     };
 
     // --- VIEWS / TEMPLATES ---
@@ -301,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (view === 'history') {
             document.querySelectorAll('.history-list li').forEach(li => {
                 li.onclick = () => {
-                    displayDailyLogDetails(li.dataset.date, state.data.daily_logs, 'history-details');
+                    displayDailyDetails(li.dataset.date, 'history-details');
                 };
             });
         } else if (view === 'chart') {
@@ -374,7 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (view === 'calendar') {
             let currentCalendarDate = new Date(); // Track current month being viewed
 
-            const renderCalendar = async (date) => {
+            const renderCalendar = (date) => {
                 const year = date.getFullYear();
                 const month = date.getMonth(); // 0-indexed
                 document.getElementById('currentMonthYear').textContent = `${year}年 ${month + 1}月`;
@@ -403,8 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     calendarGrid.appendChild(emptyDay);
                 }
 
-                const response = await eel.get_calendar_data()();
-                const dailyLogs = response.daily_logs || {};
+                const dailyLogs = state.data.daily_logs || {};
 
                 for (let day = 1; day <= daysInMonth; day++) {
                     // 修正時區問題：手動格式化日期字串，避免 toISOString() 轉換成 UTC 時間
@@ -424,7 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Add event listeners to calendar days
                 document.querySelectorAll('.calendar-day:not(.empty)').forEach(dayEl => {
                     dayEl.onclick = () => {
-                        displayDailyLogDetails(dayEl.dataset.date, dailyLogs, 'calendar-history-details');
+                        displayDailyDetails(dayEl.dataset.date, 'calendar-history-details');
                     };
                 });
             };

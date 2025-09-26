@@ -3,7 +3,7 @@ import json
 import datetime
 import os
 import random
-from sqlalchemy import create_engine, Column, String, Integer, Float, Date, Boolean, JSON
+from sqlalchemy import create_engine, Column, String, Integer, Float, Date, Boolean, JSON, DateTime
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -29,14 +29,21 @@ class WeightHistory(Base):
     bmi = Column(Float, nullable=True)
     bmi_status = Column(String, nullable=True)
 
-class DailyLog(Base):
-    __tablename__ = "daily_logs"
-    id = Column(Integer, primary_key=True, index=True)
-    date = Column(Date, unique=True, index=True)
-    diet = Column(JSON, default=[])
-    exercise = Column(JSON, default=[])
-    completed = Column(Boolean, default=False)
+    class DailyLog(Base):
+        __tablename__ = "daily_logs"
+        id = Column(Integer, primary_key=True, index=True)
+        date = Column(Date, unique=True, index=True)
+        diet = Column(JSON, default=[])
+        exercise = Column(JSON, default=[])
+        completed = Column(Boolean, default=False)
 
+    class PointsHistory(Base):
+        __tablename__ = "points_history"
+        id = Column(Integer, primary_key=True, index=True)
+        timestamp = Column(DateTime, default=datetime.datetime.now)
+        description = Column(String)
+        points_change = Column(Integer)
+        current_total = Column(Integer)
 # --- BMI 計算 (與之前相同) ---
 BMI_CHART = {
     "boys": [
@@ -160,6 +167,16 @@ def get_app_data():
         
         data['current_streak'] = calculate_current_streak(db)
 
+        points_history = db.query(PointsHistory).order_by(PointsHistory.timestamp.desc()).all()
+        data['points_history'] = [
+            {
+                "timestamp": h.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                "description": h.description,
+                "points_change": h.points_change,
+                "current_total": h.current_total
+            } for h in points_history
+        ]
+
         config = json.load(open("config.json", "r", encoding="utf-8"))
         return {"config": config, "data": data}
     finally:
@@ -174,6 +191,12 @@ def save_initial(form_data):
         for key, value in form_data.items():
             set_setting(db, key, value)
         set_setting(db, 'points', 0)
+        db.add(PointsHistory(
+            timestamp=datetime.datetime.now(),
+            description="初始設定",
+            points_change=0,
+            current_total=0
+        ))
 
         height = float(form_data['height'])
         weight = float(form_data['initial_weight'])
@@ -264,14 +287,28 @@ def check_and_award_consecutive_points(db):
     last_7_day_award_str = get_setting(db, 'last_7_day_award_date')
     if consecutive_count >= 7 and (not last_7_day_award_str or (today - datetime.date.fromisoformat(last_7_day_award_str)).days >= 7):
         current_points = get_setting(db, 'points', 0)
-        set_setting(db, 'points', current_points + 10)
+        new_total = current_points + 10
+        set_setting(db, 'points', new_total)
+        db.add(PointsHistory(
+            timestamp=datetime.datetime.now(),
+            description="連續7天獎勵",
+            points_change=10,
+            current_total=new_total
+        ))
         set_setting(db, 'last_7_day_award_date', today.isoformat())
         message += "恭喜！連續完成7天任務，額外獲得10點獎勵！ "
 
     last_30_day_award_str = get_setting(db, 'last_30_day_award_date')
     if consecutive_count >= 30 and (not last_30_day_award_str or (today - datetime.date.fromisoformat(last_30_day_award_str)).days >= 30):
         current_points = get_setting(db, 'points', 0)
-        set_setting(db, 'points', current_points + 10)
+        new_total = current_points + 10
+        set_setting(db, 'points', new_total)
+        db.add(PointsHistory(
+            timestamp=datetime.datetime.now(),
+            description="連續30天獎勵",
+            points_change=10,
+            current_total=new_total
+        ))
         set_setting(db, 'last_30_day_award_date', today.isoformat())
         message += "恭喜！連續完成30天任務，額外獲得10點獎勵！"
 
@@ -293,7 +330,14 @@ def complete_day():
         
         if points_earned > 0:
             current_points = get_setting(db, 'points', 0)
-            set_setting(db, 'points', current_points + points_earned)
+            new_total = current_points + points_earned
+            set_setting(db, 'points', new_total)
+            db.add(PointsHistory(
+                timestamp=datetime.datetime.now(),
+                description="每日任務",
+                points_change=points_earned,
+                current_total=new_total
+            ))
         
         consecutive_message = check_and_award_consecutive_points(db)
         log.completed = True # Mark as completed AFTER checking for award
@@ -316,10 +360,20 @@ def redeem_reward(cost_str):
         cost = int(cost_str)
         current_points = get_setting(db, 'points', 0)
         if current_points >= cost:
-            set_setting(db, 'points', current_points - cost)
+            new_total = current_points - cost
+            set_setting(db, 'points', new_total)
+
+            config = json.load(open("config.json", "r", encoding="utf-8"))
+            reward_desc = config['rewards'].get(cost_str, "未知獎勵")
+            db.add(PointsHistory(
+                timestamp=datetime.datetime.now(),
+                description=f"兌換獎勵: {reward_desc}",
+                points_change=-cost,
+                current_total=new_total
+            ))
+
             db.commit()
-            new_points = get_setting(db, 'points')
-            return {"data": get_app_data()['data'], "message": f"恭喜你！成功兌換獎勵！\n剩餘點數: {new_points}"}
+            return {"data": get_app_data()['data'], "message": f"恭喜你！成功兌換獎勵！\n剩餘點數: {new_total}"}
         else:
             return {"error": "點數不足，沒辦法兌換喔！"}
     finally:

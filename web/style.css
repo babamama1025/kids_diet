@@ -341,3 +341,48 @@ button:disabled {
     font-weight: bold;
     box-shadow: 0 2px 5px rgba(76, 175, 80, 0.3);
 }
+
+/* Points History List in Calendar/History View */
+.points-history-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 10px;
+}
+
+.points-history-list li {
+    padding: 6px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.points-history-list li:last-child {
+    border-bottom: none;
+}
+
+.points-history-list .timestamp {
+    color: var(--light-text-color);
+    margin-right: 10px;
+    font-size: 12px;
+}
+
+.points-gain {
+    color: var(--success-color);
+    font-weight: bold;
+}
+
+.points-loss {
+    color: var(--error-color);
+    font-weight: bold;
+}
+
+#calendar-history-details {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 8px;
+}
