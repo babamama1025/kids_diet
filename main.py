@@ -29,21 +29,21 @@ class WeightHistory(Base):
     bmi = Column(Float, nullable=True)
     bmi_status = Column(String, nullable=True)
 
-    class DailyLog(Base):
-        __tablename__ = "daily_logs"
-        id = Column(Integer, primary_key=True, index=True)
-        date = Column(Date, unique=True, index=True)
-        diet = Column(JSON, default=[])
-        exercise = Column(JSON, default=[])
-        completed = Column(Boolean, default=False)
+class DailyLog(Base):
+    __tablename__ = "daily_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    diet = Column(JSON, default=[])
+    exercise = Column(JSON, default=[])
+    completed = Column(Boolean, default=False)
 
-    class PointsHistory(Base):
-        __tablename__ = "points_history"
-        id = Column(Integer, primary_key=True, index=True)
-        timestamp = Column(DateTime, default=datetime.datetime.now)
-        description = Column(String)
-        points_change = Column(Integer)
-        current_total = Column(Integer)
+class PointsHistory(Base):
+    __tablename__ = "points_history"
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.datetime.now)
+    description = Column(String)
+    points_change = Column(Integer)
+    current_total = Column(Integer)
 # --- BMI 計算 (與之前相同) ---
 BMI_CHART = {
     "boys": [
