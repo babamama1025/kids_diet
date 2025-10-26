@@ -1,0 +1,95 @@
+[33mcommit 0e825c024babeac10fd64deaf336de8218abc3de[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m)[m
+Author: unknown <babamama711025@gmail.com>
+Date:   Sat Oct 25 21:30:14 2025 +0800
+
+    Revise README.md to sync to the code
+
+[33mcommit f97093c47a745ccad86e35d61631804c0867a074[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Thu Oct 2 21:21:10 2025 +0800
+
+    Update config.json
+    
+    新增"今天沒吃手"
+
+[33mcommit c69e38ee20480c18d50a918740146c865579b554[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Fri Sep 26 23:40:27 2025 +0800
+
+    fix bug
+
+[33mcommit 21cc0d5706806fab2c679210c5252f21223a774a[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Fri Sep 26 23:33:11 2025 +0800
+
+    更新點數記錄功能
+    
+    記錄每天的累計點數、新增點數，使用點數時也會做紀錄
+
+[33mcommit 95aed6c8f42818f4320f65c9cb207a11d9bb27c7[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Tue Sep 2 18:47:15 2025 +0800
+
+    fix bug (日曆未顯示歷史紀錄細節)
+
+[33mcommit e1013211b0425be098f76b9a87088ed8819e8c6f[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Tue Sep 2 18:29:32 2025 +0800
+
+    在日曆中可檢視歷史紀錄
+
+[33mcommit 644af01d3ba30f9001408595e42bca26197ff313[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Mon Sep 1 22:35:59 2025 +0800
+
+    brush teeth after breakfast
+
+[33mcommit 3d79ef64811fd6b20d186cd5186da6656ea9ea96[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Mon Sep 1 09:26:17 2025 +0800
+
+    fix format
+
+[33mcommit 8f9e5cc59c6dde1319a4c6d482b621054160a42c[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Mon Sep 1 09:12:35 2025 +0800
+
+    modify reward
+
+[33mcommit 180986d45f53b421d4333ce37ff54d26d6e5aebf[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Sun Aug 31 23:41:48 2025 +0800
+
+    update minecoin
+
+[33mcommit 2f2e09c90e5eb1adcd782ec03d608bcb066679e4[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Mon Aug 11 07:34:59 2025 +0800
+
+    bug fixed
+    
+    日期讀取時區修正
+
+[33mcommit 8de0f9c41a9a736ad548a363ea4a89ac68ba6e04[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Sun Aug 10 21:38:41 2025 +0800
+
+    bug fixed
+
+[33mcommit 14484111e066b705d12555716d0a5640f2ca444c[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Sun Aug 10 21:14:55 2025 +0800
+
+    bug fixed
+
+[33mcommit c6da66db9682c7bb78641a64dc2fd13129bbd314[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Sun Aug 10 21:01:56 2025 +0800
+
+    update
+
+[33mcommit c6446727b17740c99ba0d6543330cb7dfb602d5f[m
+Author: babamama1025 <babamama711025@gmail.com>
+Date:   Sun Aug 10 18:36:26 2025 +0800
+
+    Add files via upload
