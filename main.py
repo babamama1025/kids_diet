@@ -444,7 +444,7 @@ if __name__ == "__main__":
     init_db()
     eel.init('web')
     port = int(os.environ.get('PORT', 8000))
-    host = '0.0.0.0' if 'DATABASE_URL' in os.environ else 'localhost'
+    host = '0.0.0.0' # Always listen on 0.0.0.0 in a containerized environment
     try:
         print(f"正在啟動應用程式於 http://{host}:{port}")
         eel.start('index.html', mode=None, host=host, port=port)
