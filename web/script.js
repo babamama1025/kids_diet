@@ -132,6 +132,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="card">
                     ${isCompleted ? '<p style="color: var(--success-color); text-align: center; font-weight: bold;">今日任務已完成！</p>' : '<button id="complete-day" class="success">✔️ 完成今天任務</button>'}
                     <div class="button-group">
+                        <button data-view="dynamicTasks" class="dynamic-tasks-btn">🎯 動態任務</button>
+                        <button data-view="manageTasks">⚙️ 任務管理</button>
                         <button data-view="logHealth">更新身高及體重</button>
                         <button data-view="rewards">獎勵商店</button>
                         <button data-view="logExercise" class="${exerciseLogged ? 'logged' : ''}">紀錄運動 ${exerciseLogged ? '✓' : ''}</button>
@@ -254,6 +256,114 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div id="calendar-history-details" class="history-details">點擊日曆上的日期查看詳情</div>
                 <button data-view="dashboard" class="secondary">返回</button>
+            </div>
+        `,
+        dynamicTasks: () => {
+            const tasks = state.data.active_dynamic_tasks || [];
+
+            if (tasks.length === 0) {
+                return `
+                    <div class="card">
+                        <h2>🎯 動態任務</h2>
+                        <p style="text-align: center; color: var(--light-text-color);">
+                            目前沒有可用的動態任務喔！
+                        </p>
+                        <button data-view="dashboard" class="secondary">返回</button>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="card">
+                    <h2>🎯 動態任務</h2>
+                    <p>完成任務就能獲得點數！</p>
+                    <div class="dynamic-tasks-list">
+                        ${tasks.map(task => {
+                            const hours = Math.floor(task.time_remaining / 3600);
+                            const minutes = Math.floor((task.time_remaining % 3600) / 60);
+                            const timeText = hours > 0 ? `${hours}小時${minutes}分` : `${minutes}分鐘`;
+
+                            return `
+                                <div class="dynamic-task-item ${task.is_completed ? 'completed' : ''}">
+                                    <div class="task-header">
+                                        <h3>${task.title}</h3>
+                                        <span class="task-points">+${task.points_reward} 點</span>
+                                    </div>
+                                    ${task.description ? `<p class="task-description">${task.description}</p>` : ''}
+                                    <div class="task-footer">
+                                        <span class="task-timer">⏰ 剩餘: ${timeText}</span>
+                                        ${task.is_completed
+                                            ? '<span class="task-status completed">✓ 已完成</span>'
+                                            : `<button class="complete-dynamic-task" data-task-id="${task.id}">完成任務</button>`
+                                        }
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    <button data-view="dashboard" class="secondary">返回</button>
+                </div>
+            `;
+        },
+        manageTasks: () => `
+            <div class="card">
+                <h2>任務管理中心</h2>
+                <p style="color: var(--light-text-color); font-size: 14px;">
+                    家長專用：創建和管理動態任務
+                </p>
+                <button id="create-task-btn" class="success">+ 創建新任務</button>
+                <button id="view-all-tasks-btn">查看所有任務</button>
+                <button data-view="dashboard" class="secondary">返回</button>
+            </div>
+        `,
+        createTask: () => {
+            const now = new Date();
+            const today = now.toISOString().split('T')[0];
+            const currentTime = now.toTimeString().slice(0, 5);
+
+            return `
+                <div class="card">
+                    <h2>創建動態任務</h2>
+                    <div class="input-group">
+                        <label for="task-title">任務標題 *</label>
+                        <input type="text" id="task-title" placeholder="例：整理房間" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="task-description">任務描述（可選）</label>
+                        <textarea id="task-description" rows="3" placeholder="詳細說明任務內容..."></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label for="task-points">獎勵點數 *</label>
+                        <input type="number" id="task-points" min="1" value="5" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="task-start-date">開始日期 *</label>
+                        <input type="date" id="task-start-date" value="${today}" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="task-start-time">開始時間 *</label>
+                        <input type="time" id="task-start-time" value="${currentTime}" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="task-end-date">結束日期 *</label>
+                        <input type="date" id="task-end-date" value="${today}" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="task-end-time">結束時間 *</label>
+                        <input type="time" id="task-end-time" value="23:59" required>
+                    </div>
+                    <button id="save-task" class="success">創建任務</button>
+                    <button data-view="manageTasks" class="secondary">取消</button>
+                </div>
+            `;
+        },
+        allTasks: () => `
+            <div class="card">
+                <h2>所有任務</h2>
+                <div id="all-tasks-container">
+                    <p style="text-align: center;">載入中...</p>
+                </div>
+                <button data-view="manageTasks" class="secondary">返回</button>
             </div>
         `
     };
@@ -453,7 +563,103 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             renderCalendar(currentCalendarDate); // Initial render
+        } else if (view === 'dynamicTasks') {
+            // 綁定「完成任務」按鈕
+            document.querySelectorAll('.complete-dynamic-task').forEach(btn => {
+                btn.onclick = async () => {
+                    const taskId = parseInt(btn.dataset.taskId);
+                    const response = await eel.complete_dynamic_task(taskId)();
+                    if (handleApiResponse(response)) render('dynamicTasks');
+                };
+            });
+        } else if (view === 'manageTasks') {
+            document.getElementById('create-task-btn').onclick = () => {
+                render('createTask');
+            };
+            document.getElementById('view-all-tasks-btn').onclick = () => {
+                render('allTasks');
+            };
+        } else if (view === 'createTask') {
+            document.getElementById('save-task').onclick = async () => {
+                const taskData = {
+                    title: document.getElementById('task-title').value,
+                    description: document.getElementById('task-description').value,
+                    points_reward: document.getElementById('task-points').value,
+                    start_time: document.getElementById('task-start-date').value + 'T' +
+                               document.getElementById('task-start-time').value + ':00',
+                    end_time: document.getElementById('task-end-date').value + 'T' +
+                             document.getElementById('task-end-time').value + ':00'
+                };
+                const response = await eel.create_dynamic_task(taskData)();
+                if (handleApiResponse(response)) render('manageTasks');
+            };
+        } else if (view === 'allTasks') {
+            // 載入所有任務
+            loadAllTasks();
         }
+    };
+
+    // --- HELPER FUNCTIONS (continued) ---
+    const loadAllTasks = async () => {
+        const response = await eel.get_all_dynamic_tasks()();
+        const tasks = response.tasks || [];
+
+        const container = document.getElementById('all-tasks-container');
+
+        if (tasks.length === 0) {
+            container.innerHTML = '<p style="text-align: center;">尚未創建任何任務</p>';
+            return;
+        }
+
+        const statusText = {
+            'active': '進行中',
+            'expired': '已過期',
+            'upcoming': '未開始'
+        };
+
+        const statusClass = {
+            'active': 'status-active',
+            'expired': 'status-expired',
+            'upcoming': 'status-upcoming'
+        };
+
+        container.innerHTML = `
+            <div class="all-tasks-list">
+                ${tasks.map(task => `
+                    <div class="task-item ${statusClass[task.status]}">
+                        <div class="task-header">
+                            <h4>${task.title}</h4>
+                            <span class="task-status-badge ${statusClass[task.status]}">
+                                ${statusText[task.status]}
+                            </span>
+                        </div>
+                        ${task.description ? `<p>${task.description}</p>` : ''}
+                        <div class="task-meta">
+                            <span>點數: ${task.points_reward}</span>
+                            <span>時間: ${new Date(task.start_time).toLocaleString('zh-TW')} -
+                                  ${new Date(task.end_time).toLocaleString('zh-TW')}</span>
+                        </div>
+                        ${task.is_active ?
+                            `<button class="delete-task" data-task-id="${task.id}">刪除</button>` :
+                            '<span style="color: var(--light-text-color);">已刪除</span>'
+                        }
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        // 綁定刪除按鈕
+        document.querySelectorAll('.delete-task').forEach(btn => {
+            btn.onclick = async () => {
+                if (confirm('確定要刪除此任務嗎？')) {
+                    const taskId = parseInt(btn.dataset.taskId);
+                    const response = await eel.delete_dynamic_task(taskId)();
+                    if (handleApiResponse(response)) {
+                        loadAllTasks(); // 重新載入
+                    }
+                }
+            };
+        });
     };
 
     // --- INITIALIZATION ---
