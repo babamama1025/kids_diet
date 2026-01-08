@@ -1,3 +1,12 @@
-eel
-SQLAlchemy
-psycopg2-binary
+# Web 框架 - Python 與網頁前端橋接
+eel>=0.16.0
+
+# 資料庫 ORM
+SQLAlchemy>=2.0.0
+
+# PostgreSQL 資料庫驅動（生產環境用）
+psycopg2-binary>=2.9.0
+
+# 注意：SQLite 支援是 Python 內建的，不需要額外安裝
+# 開發環境預設使用 SQLite (kids_diet.db)
+# 生產環境可透過 DATABASE_URL 環境變數切換到 PostgreSQL

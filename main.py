@@ -44,6 +44,24 @@ class PointsHistory(Base):
     description = Column(String)
     points_change = Column(Integer)
     current_total = Column(Integer)
+
+class DynamicTask(Base):
+    __tablename__ = "dynamic_tasks"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    points_reward = Column(Integer, default=1)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    is_active = Column(Boolean, default=True)
+
+class DynamicTaskCompletion(Base):
+    __tablename__ = "dynamic_task_completions"
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, nullable=False, index=True)
+    completed_at = Column(DateTime, default=datetime.datetime.now)
+    points_earned = Column(Integer)
 # --- BMI 計算 (與之前相同) ---
 BMI_CHART = {
     "boys": [
@@ -175,6 +193,32 @@ def get_app_data():
                 "points_change": h.points_change,
                 "current_total": h.current_total
             } for h in points_history
+        ]
+
+        # 獲取活躍的動態任務
+        now = datetime.datetime.now()
+        active_tasks = db.query(DynamicTask).filter(
+            DynamicTask.is_active == True,
+            DynamicTask.start_time <= now,
+            DynamicTask.end_time >= now
+        ).order_by(DynamicTask.end_time).all()
+
+        completed_task_ids = set(
+            row[0] for row in db.query(DynamicTaskCompletion.task_id).all()
+        )
+
+        data['active_dynamic_tasks'] = [
+            {
+                'id': task.id,
+                'title': task.title,
+                'description': task.description or '',
+                'points_reward': task.points_reward,
+                'start_time': task.start_time.isoformat(),
+                'end_time': task.end_time.isoformat(),
+                'is_completed': task.id in completed_task_ids,
+                'time_remaining': int((task.end_time - now).total_seconds())
+            }
+            for task in active_tasks
         ]
 
         config = json.load(open("config.json", "r", encoding="utf-8"))
@@ -432,6 +476,196 @@ def populate_test_data():
     except Exception as e:
         db.rollback()
         return {"error": f"載入測試資料失敗: {str(e)}"}
+    finally:
+        db.close()
+
+# --- 動態任務 API ---
+@eel.expose
+def create_dynamic_task(task_data):
+    """創建新的動態任務"""
+    db = SessionLocal()
+    try:
+        # 驗證必填欄位
+        if not all([task_data.get('title'), task_data.get('points_reward'),
+                   task_data.get('start_time'), task_data.get('end_time')]):
+            return {"error": "任務標題、點數、開始和結束時間都是必填的！"}
+
+        # 解析時間
+        start_time = datetime.datetime.fromisoformat(task_data['start_time'])
+        end_time = datetime.datetime.fromisoformat(task_data['end_time'])
+
+        # 驗證時間範圍
+        if start_time >= end_time:
+            return {"error": "結束時間必須晚於開始時間！"}
+
+        # 創建任務
+        new_task = DynamicTask(
+            title=task_data['title'],
+            description=task_data.get('description', ''),
+            points_reward=int(task_data['points_reward']),
+            start_time=start_time,
+            end_time=end_time
+        )
+        db.add(new_task)
+        db.commit()
+
+        return {"message": "任務創建成功！", "data": get_app_data()['data']}
+    except ValueError:
+        db.rollback()
+        return {"error": "時間格式或點數格式錯誤！"}
+    except Exception as e:
+        db.rollback()
+        return {"error": f"創建任務失敗：{str(e)}"}
+    finally:
+        db.close()
+
+@eel.expose
+def get_active_dynamic_tasks():
+    """獲取當前有效的動態任務列表"""
+    db = SessionLocal()
+    try:
+        now = datetime.datetime.now()
+
+        # 查詢所有在有效時間範圍內的任務
+        active_tasks = db.query(DynamicTask).filter(
+            DynamicTask.is_active == True,
+            DynamicTask.start_time <= now,
+            DynamicTask.end_time >= now
+        ).order_by(DynamicTask.end_time).all()
+
+        # 查詢已完成的任務ID列表
+        completed_task_ids = set(
+            row[0] for row in db.query(DynamicTaskCompletion.task_id).all()
+        )
+
+        tasks_data = []
+        for task in active_tasks:
+            time_remaining = int((task.end_time - now).total_seconds())
+            tasks_data.append({
+                'id': task.id,
+                'title': task.title,
+                'description': task.description or '',
+                'points_reward': task.points_reward,
+                'start_time': task.start_time.isoformat(),
+                'end_time': task.end_time.isoformat(),
+                'is_completed': task.id in completed_task_ids,
+                'time_remaining': time_remaining
+            })
+
+        return {'tasks': tasks_data}
+    finally:
+        db.close()
+
+@eel.expose
+def complete_dynamic_task(task_id):
+    """完成動態任務並發放點數"""
+    db = SessionLocal()
+    try:
+        now = datetime.datetime.now()
+
+        # 查詢任務
+        task = db.query(DynamicTask).filter(DynamicTask.id == task_id).first()
+        if not task:
+            return {"error": "任務不存在！"}
+
+        # 檢查任務是否已過期
+        if now > task.end_time:
+            return {"error": "任務已過期，無法完成！"}
+
+        if now < task.start_time:
+            return {"error": "任務尚未開始！"}
+
+        # 檢查是否已完成
+        existing_completion = db.query(DynamicTaskCompletion).filter(
+            DynamicTaskCompletion.task_id == task_id
+        ).first()
+
+        if existing_completion:
+            return {"error": "此任務已經完成過囉！"}
+
+        # 發放點數
+        current_points = get_setting(db, 'points', 0)
+        new_total = current_points + task.points_reward
+        set_setting(db, 'points', new_total)
+
+        # 記錄完成狀態
+        completion = DynamicTaskCompletion(
+            task_id=task_id,
+            points_earned=task.points_reward,
+            completed_at=now
+        )
+        db.add(completion)
+
+        # 記錄點數歷史
+        db.add(PointsHistory(
+            timestamp=now,
+            description=f"完成動態任務: {task.title}",
+            points_change=task.points_reward,
+            current_total=new_total
+        ))
+
+        db.commit()
+
+        return {
+            "message": f"任務完成！獲得 {task.points_reward} 點數！",
+            "data": get_app_data()['data']
+        }
+    except Exception as e:
+        db.rollback()
+        return {"error": f"完成任務失敗：{str(e)}"}
+    finally:
+        db.close()
+
+@eel.expose
+def get_all_dynamic_tasks():
+    """獲取所有動態任務（包括過期的）供管理介面使用"""
+    db = SessionLocal()
+    try:
+        now = datetime.datetime.now()
+        all_tasks = db.query(DynamicTask).order_by(
+            DynamicTask.created_at.desc()
+        ).all()
+
+        tasks_data = []
+        for task in all_tasks:
+            if now < task.start_time:
+                status = 'upcoming'
+            elif now > task.end_time:
+                status = 'expired'
+            else:
+                status = 'active'
+
+            tasks_data.append({
+                'id': task.id,
+                'title': task.title,
+                'description': task.description or '',
+                'points_reward': task.points_reward,
+                'start_time': task.start_time.isoformat(),
+                'end_time': task.end_time.isoformat(),
+                'is_active': task.is_active,
+                'status': status
+            })
+
+        return {'tasks': tasks_data}
+    finally:
+        db.close()
+
+@eel.expose
+def delete_dynamic_task(task_id):
+    """刪除動態任務（軟刪除）"""
+    db = SessionLocal()
+    try:
+        task = db.query(DynamicTask).filter(DynamicTask.id == task_id).first()
+        if not task:
+            return {"error": "任務不存在！"}
+
+        task.is_active = False
+        db.commit()
+
+        return {"message": "任務已刪除！"}
+    except Exception as e:
+        db.rollback()
+        return {"error": f"刪除失敗：{str(e)}"}
     finally:
         db.close()
 
